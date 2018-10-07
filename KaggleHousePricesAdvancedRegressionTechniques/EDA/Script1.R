@@ -3,6 +3,7 @@ library(dplyr)
 library(forcats) # for factors
 library(ggplot2)
 library(broom)
+library(sqldf)
 
 #https://www.kaggle.com/c/house-prices-advanced-regression-techniques
 
@@ -20,41 +21,20 @@ OriginalData <- read.csv(file = "train.csv", header = TRUE, sep = ",")
 
 # for Fence missing means no fence - so recode missing
 OriginalData$Fence <- fct_explicit_na(OriginalData$Fence, "NoFence")
+# Alley 
+OriginalData$Alley <- fct_explicit_na(OriginalData$Alley, "NoAlley")
 
-sum(table(OriginalData$Fence))
+# impute missing LotFrontage
+FilteredData <- OriginalData 
+FilteredData$Outlier <- isnt_out_tukey(FilteredData$LotArea)
+FilteredData = sqldf("select * from FilteredData where Outlier = 1")
+fit <- lm(LotFrontage ~ LotArea, FilteredData)
+tidy(fit)
+Slope <- coef(fit)[term = 'LotArea']
+Intercept <- coef(fit)[term = '(Intercept)']
+OriginalData$LotFrontage[is.na(OriginalData$LotFrontage)] <- Intercept + (Slope * OriginalData$LotArea)[is.na(OriginalData$LotFrontage)]
 
-nrow(OriginalData)
 
 # find columns with missing values
 ColumnWithMissingValues <- colnames(OriginalData)[colSums(is.na(OriginalData)) > 0]
 ColumnWithMissingValues
-
-#ClosedMatters$claimants_age[is.na(ClosedMatters$claimants_age)] <- mean(ClosedMatters$claimants_age, na.rm = T)
-
-sum(is.na(OriginalData$LotAreaUnSq))
-
-#table(OriginalData$LotFrontage)
-#LotAreaUnSq correlated to
-
-ggplot(OriginalData, aes(x = LotArea, y = LotFrontage)) +
-    geom_point() +
-    coord_cartesian(xlim = c(0, 50000), ylim = c(0, 200))
-
-
-FilteredData <- OriginalData #%>%
-    #select(LotFrontage, LotArea) %>%
-    #filter(LotArea <= 25000)
-
-fit <- lm(LotFrontage ~ LotArea, FilteredData)
-tidy(fit)
-
-Slope <- coef(fit)[term = 'LotArea']
-Intercept <- coef(fit)[term = '(Intercept)']
-
-OriginalData$LotFrontage[is.na(OriginalData$LotFrontage)] <- Intercept + (Slope * OriginalData$LotArea)
-
-sum(is.na(OriginalData$LotFrontage))
-ggplot(OriginalData, aes(x = LotArea, y = LotFrontage)) +
-    geom_point() +
-    geom_abline(intercept = Intercept, slope = Slope) +
-    coord_cartesian(xlim = c(0, 50000), ylim = c(0, 200))
